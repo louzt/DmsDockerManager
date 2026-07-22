@@ -368,7 +368,7 @@ PluginComponent {
 
     component DockerIcon: DankNFIcon {
         name: "docker"
-        size: root.iconSize
+        size: Theme.barIconSize(root.barThickness, -4)
         color: {
             if (!globalDockerAvailable.value)
                 return Theme.error;
@@ -380,7 +380,7 @@ PluginComponent {
 
     component DockerCount: StyledText {
         text: globalRunningContainers.value.toString()
-        font.pixelSize: Theme.barTextSize(root.barThickness, root.barConfig?.fontScale)
+        font.pixelSize: Theme.fontSizeMedium
         color: Theme.widgetTextColor || Theme.surfaceText
         visible: globalRunningContainers.value > 0
     }
@@ -398,9 +398,8 @@ PluginComponent {
         width: parent.width
         height: 52
         radius: Theme.cornerRadius
-        color: (isCurrentItem || projectMouse.containsMouse) ? Theme.withAlpha(Theme.surfaceContainerHighest, Theme.popupTransparency) : Theme.withAlpha(Theme.surfaceContainerHigh, Theme.popupTransparency)
-        border.width: Theme.layerOutlineWidth
-        border.color: Theme.outlineLight
+        color: isCurrentItem ? Theme.surfaceContainerHighest : (projectMouse.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
+        border.width: 0
 
         DankIcon {
             name: "account_tree"
@@ -490,16 +489,15 @@ PluginComponent {
         property real leftIndent: Theme.spacingM
         property real iconSize: Theme.iconSize
         property real baseHeight: 48
-        property color defaultColor: Theme.withAlpha(Theme.surfaceContainerHigh, Theme.popupTransparency)
-        property color hoverColor: Theme.withAlpha(Theme.surfaceContainerHighest, Theme.popupTransparency)
+        property color defaultColor: Theme.surfaceContainerHigh
+        property color hoverColor: Theme.surfaceContainerHighest
         signal clicked
 
         width: parent.width
         height: baseHeight + (isExpanded && root.showPorts && containerData?.ports?.length > 0 ? Theme.spacingS + portFlow.height + Theme.spacingXS : 0)
         radius: Theme.cornerRadius
         color: isCurrentItem ? hoverColor : (headerMouse.containsMouse ? hoverColor : defaultColor)
-        border.width: Theme.layerOutlineWidth
-        border.color: Theme.outlineLight
+        border.width: 0
 
         Behavior on height {
             NumberAnimation {
@@ -841,14 +839,10 @@ PluginComponent {
             implicitHeight: popoutColumn.implicitHeight
             focus: true
 
-            property var parentPopout: null
-            Connections {
-                target: parentPopout
-                function onOpened() {
-                    Qt.callLater(() => {
-                        forceActiveFocus();
-                    });
-                }
+            Component.onCompleted: {
+                Qt.callLater(() => {
+                    forceActiveFocus();
+                });
             }
 
             Keys.onPressed: event => {
@@ -897,8 +891,7 @@ PluginComponent {
                         anchors.verticalCenter: parent.verticalCenter
                         text: globalDockerAvailable.value ? `${globalRunningContainers.value} running containers` : "Docker not available"
                         font.pixelSize: Theme.fontSizeMedium
-                        font.weight: Font.Medium
-                        color: Theme.surfaceText
+                        color: Theme.surfaceVariantText
                     }
 
                     Row {
@@ -936,7 +929,7 @@ PluginComponent {
                     bottomMargin: Theme.spacingS
                     leftMargin: Theme.spacingM
                     rightMargin: Theme.spacingM
-                    spacing: Theme.spacingS
+                    spacing: 2
                     clip: true
                     visible: !root.groupByCompose
                     model: globalContainers.value
@@ -946,39 +939,23 @@ PluginComponent {
                         root.containerListView = containerList;
                     }
 
-                    delegate: StyledRect {
+                    delegate: Column {
                         id: containerDelegate
                         width: containerList.width - containerList.leftMargin - containerList.rightMargin
-                        radius: Theme.cornerRadius
-                        Component.onCompleted: height = Qt.binding(() => containerHeaderPart.height + containerActionsPart.height)
-                        color: isCurrentItem ? Theme.withAlpha(Theme.surfaceContainerHighest, Theme.popupTransparency) : Theme.withAlpha(Theme.surfaceContainerHigh, Theme.popupTransparency)
-                        border.width: 1
-                        border.color: {
-                            if (modelData.isRunning) return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.5)
-                            if (modelData.isPaused) return Qt.rgba(Theme.warning.r, Theme.warning.g, Theme.warning.b, 0.5)
-                            return Theme.outlineLight
-                        }
-                        clip: true
+                        spacing: 0
 
                         property bool isExpanded: root.expandedContainers[modelData.id] || false
                         property bool isCurrentItem: root.keyboardNavigationActive && !root.groupByCompose && root.selectedItemId === modelData.id
 
                         ContainerHeader {
-                            id: containerHeaderPart
-                            width: parent.width
                             containerData: modelData
                             isExpanded: containerDelegate.isExpanded
                             isCurrentItem: containerDelegate.isCurrentItem
-                            defaultColor: "transparent"
-                            hoverColor: Theme.surfaceHover
-                            border.width: 0
                             onClicked: root.toggleContainer(modelData.id)
                         }
 
                         ContainerActions {
-                            id: containerActionsPart
-                            width: parent.width
-                            anchors.top: containerHeaderPart.bottom
+                            id: containerActionsDelegate
                             containerData: modelData
                             leftIndent: Theme.spacingL + Theme.spacingM
                             isExpanded: containerDelegate.isExpanded
@@ -1000,7 +977,7 @@ PluginComponent {
                     bottomMargin: Theme.spacingS
                     leftMargin: Theme.spacingM
                     rightMargin: Theme.spacingM
-                    spacing: Theme.spacingS
+                    spacing: 2
                     clip: true
                     visible: root.groupByCompose
                     model: globalComposeProjects.value
@@ -1010,46 +987,30 @@ PluginComponent {
                         root.projectListView = projectList;
                     }
 
-                    delegate: StyledRect {
+                    delegate: Column {
                         id: projectDelegate
                         width: projectList.width - projectList.leftMargin - projectList.rightMargin
-                        radius: Theme.cornerRadius
-                        Component.onCompleted: height = Qt.binding(() => projectHeaderPart.height + projectContentPart.height)
-                        color: isCurrentItem ? Theme.withAlpha(Theme.surfaceContainerHighest, Theme.popupTransparency) : Theme.withAlpha(Theme.surfaceContainerHigh, Theme.popupTransparency)
-                        border.width: 1
-                        border.color: {
-                            if (modelData.runningCount === modelData.totalCount && modelData.totalCount > 0)
-                                return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.5)
-                            if (modelData.runningCount > 0)
-                                return Qt.rgba(Theme.warning.r, Theme.warning.g, Theme.warning.b, 0.5)
-                            return Theme.outlineLight
-                        }
-                        clip: true
+                        spacing: 0
 
                         property bool isExpanded: root.expandedProjects[modelData.name] || false
                         property bool isCurrentItem: root.keyboardNavigationActive && root.groupByCompose && !root.selectedIsContainer && root.selectedItemId === modelData.name
 
                         ProjectHeader {
-                            id: projectHeaderPart
-                            width: parent.width
                             projectName: modelData.name
                             runningCount: modelData.runningCount
                             totalCount: modelData.totalCount
                             serviceCount: modelData.containers.length
                             isExpanded: projectDelegate.isExpanded
                             isCurrentItem: projectDelegate.isCurrentItem
-                            color: "transparent"
-                            border.width: 0
                             onClicked: root.toggleProject(modelData.name)
                         }
 
                         Column {
-                            id: projectContentPart
+                            id: projectContent
                             width: parent.width
-                            anchors.top: projectHeaderPart.bottom
                             spacing: 2
                             clip: true
-
+                            
                             property var project: modelData
 
                             height: projectDelegate.isExpanded ? projectContentInner.height : 0
@@ -1071,14 +1032,12 @@ PluginComponent {
 
                             Column {
                                 id: projectContentInner
-                                width: parent.width - Theme.spacingS * 2
-                                x: Theme.spacingS
-                                spacing: Theme.spacingXS
+                                width: parent.width
+                                spacing: 2
                                 topPadding: Theme.spacingXS
-                                bottomPadding: Theme.spacingS
 
                                 ProjectActions {
-                                    projectData: projectContentPart.project
+                                    projectData: projectContent.project
                                     leftIndent: Theme.spacingL
                                     isExpanded: projectDelegate.isExpanded
                                     isCurrentItem: projectDelegate.isCurrentItem
@@ -1096,48 +1055,33 @@ PluginComponent {
                                 }
 
                                 Repeater {
-                                    model: projectContentPart.project.containers
+                                    model: projectContent.project.containers
 
-                                    StyledRect {
+                                    Column {
                                         id: serviceDelegate
                                         width: parent.width
-                                        radius: Theme.cornerRadius
-                                        Component.onCompleted: height = Qt.binding(() => serviceHeaderPart.height + serviceActionsPart.height)
-                                        color: isCurrentItem ? Theme.withAlpha(Theme.surfaceContainerHighest, Theme.popupTransparency) : Theme.nestedSurface
-                                        border.width: 1
-                                        border.color: {
-                                            if (container.isRunning) return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.4)
-                                            if (container.isPaused) return Qt.rgba(Theme.warning.r, Theme.warning.g, Theme.warning.b, 0.4)
-                                            return Theme.outlineLight
-                                        }
-                                        clip: true
+                                        spacing: 0
 
                                         property var container: modelData
                                         property bool isExpanded: root.expandedContainers[container.name] || false
                                         property bool isCurrentItem: root.keyboardNavigationActive && root.groupByCompose && root.selectedIsContainer && root.selectedItemId === container.name
 
                                         ContainerHeader {
-                                            id: serviceHeaderPart
-                                            width: parent.width
                                             containerData: container
                                             isExpanded: serviceDelegate.isExpanded
                                             isCurrentItem: serviceDelegate.isCurrentItem
                                             useComposeServiceName: true
-                                            leftIndent: Theme.spacingM
+                                            leftIndent: Theme.spacingL
                                             iconSize: Theme.iconSize - 2
                                             baseHeight: 38
-                                            defaultColor: "transparent"
-                                            hoverColor: Theme.surfaceHover
-                                            border.width: 0
-                                            onClicked: root.toggleContainer(container.name, projectContentPart.project.name)
+                                            defaultColor: Theme.surfaceContainer
+                                            hoverColor: Theme.surfaceContainerHigh
+                                            onClicked: root.toggleContainer(container.name, projectContent.project.name)
                                         }
 
                                         ContainerActions {
-                                            id: serviceActionsPart
-                                            width: parent.width
-                                            anchors.top: serviceHeaderPart.bottom
                                             containerData: container
-                                            leftIndent: Theme.spacingM + Theme.spacingL
+                                            leftIndent: Theme.spacingL * 2
                                             isExpanded: serviceDelegate.isExpanded
                                             isCurrentItem: serviceDelegate.isCurrentItem
                                             onIsCurrentItemChanged: {
@@ -1194,7 +1138,7 @@ PluginComponent {
         width: parent.width
         height: 44
         radius: 0
-        color: isSelected ? Theme.primaryHover : (actionMouse.containsMouse ? Theme.surfaceHover : "transparent")
+        color: isSelected ? Theme.primaryHover : (actionMouse.containsMouse ? Theme.surfaceContainerHighest : "transparent")
         border.width: 0
         opacity: enabled ? 1.0 : 0.5
 
