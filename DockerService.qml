@@ -13,8 +13,7 @@ Item {
             debounceDelay: 300,
             dockerBinary: "docker",
             terminalApp: "alacritty --hold",
-            shellPath: "/bin/sh",
-            pollingInterval: 0
+            shellPath: "/bin/sh"
         })
 
     readonly property string pluginId: "dockerManager"
@@ -25,7 +24,6 @@ Item {
     property string dockerBinary: defaults.dockerBinary
     property string terminalApp: defaults.terminalApp
     property string shellPath: defaults.shellPath
-    property int pollingInterval: defaults.pollingInterval
 
     function loadSettings() {
         const load = key => PluginService.loadPluginData(pluginId, key) || defaults[key];
@@ -33,7 +31,6 @@ Item {
         dockerBinary = load("dockerBinary");
         terminalApp = load("terminalApp");
         shellPath = load("shellPath");
-        pollingInterval = load("pollingInterval");
 
         refresh();
     }
@@ -54,6 +51,29 @@ Item {
 
     function getDockerEventCommand() {
         return [dockerBinary, "events", "--format", "json", "--filter", "type=container"];
+    }
+
+    function shellEscape(value) {
+        const text = String(value ?? "");
+        return `'${text.replace(/'/g, `'"'"'`)}'`;
+    }
+
+    function parseComposeConfigFiles(configFiles) {
+        const parsed = String(configFiles || "compose.yaml")
+            .split(",")
+            .map(filePath => filePath.trim())
+            .filter(Boolean);
+        return parsed.length > 0 ? parsed : ["compose.yaml"];
+    }
+
+    function buildComposeCommand(workingDir, configFiles, actionArgs) {
+        const escapedWorkingDir = shellEscape(workingDir);
+        const escapedDockerBinary = shellEscape(dockerBinary);
+        const configFlags = parseComposeConfigFiles(configFiles)
+            .map(filePath => `-f ${shellEscape(filePath)}`)
+            .join(" ");
+
+        return `cd ${escapedWorkingDir} && ${escapedDockerBinary} compose ${configFlags} ${actionArgs}`;
     }
 
     onDockerBinaryChanged: {
@@ -106,16 +126,6 @@ Item {
                 console.log("DockerManager: Attempting to restart events listener...");
                 eventsProcess.running = true;
             }
-        }
-    }
-
-    property var pollingTimer: Timer {
-        interval: root.pollingInterval
-        running: root.dockerAvailable && root.pollingInterval > 0
-        repeat: true
-        onTriggered: {
-            console.log("DockerManager: Polling for container state updates");
-            fetchContainers();
         }
     }
 
@@ -274,24 +284,24 @@ Item {
             return false;
         }
 
-        const composeCommands = {
-            up: [dockerBinary, "compose", "-f", configFile, "up", "-d"],
-            down: [dockerBinary, "compose", "-f", configFile, "down"],
-            restart: [dockerBinary, "compose", "-f", configFile, "restart"],
-            stop: [dockerBinary, "compose", "-f", configFile, "stop"],
-            start: [dockerBinary, "compose", "-f", configFile, "start"],
-            pull: [dockerBinary, "compose", "-f", configFile, "pull"],
-            logs: null
+        const composeActionArgs = {
+            up: "up -d",
+            down: "down",
+            restart: "restart",
+            stop: "stop",
+            start: "start",
+            pull: "pull",
+            logs: "logs -f"
         };
 
         if (action === "logs") {
-            const cmd = `cd "${workingDir}" && ${dockerBinary} compose -f ${configFile} logs -f`;
-            Quickshell.execDetached(["sh", "-c", `${terminalApp} -e sh -c '${cmd}'`]);
+            const cmd = buildComposeCommand(workingDir, configFile, composeActionArgs.logs);
+            Quickshell.execDetached(["sh", "-c", `${terminalApp} -e sh -c ${shellEscape(cmd)}`]);
             return true;
         }
 
-        if (composeCommands[action]) {
-            const cmd = ["sh", "-c", `cd "${workingDir}" && ${composeCommands[action].join(" ")}`];
+        if (composeActionArgs[action]) {
+            const cmd = ["sh", "-c", buildComposeCommand(workingDir, configFile, composeActionArgs[action])];
             const cmdArray = systemdRunAvailable ? ["systemd-run", "--user", "--scope", "--", ...cmd] : cmd;
             Quickshell.execDetached(cmdArray);
             Qt.callLater(() => {
