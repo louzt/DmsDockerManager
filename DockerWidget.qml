@@ -398,7 +398,7 @@ PluginComponent {
         width: parent.width
         height: 52
         radius: Theme.cornerRadius
-        color: isCurrentItem ? Theme.surfaceContainerHighest : (projectMouse.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
+        color: isCurrentItem ? Theme.surfaceHover : (projectMouse.containsMouse ? Theme.surfaceHover : Theme.surfaceContainerHigh)
         border.width: 0
 
         DankIcon {
@@ -490,7 +490,7 @@ PluginComponent {
         property real iconSize: Theme.iconSize
         property real baseHeight: 48
         property color defaultColor: Theme.surfaceContainerHigh
-        property color hoverColor: Theme.surfaceContainerHighest
+        property color hoverColor: Theme.surfaceHover
         signal clicked
 
         width: parent.width
@@ -1138,7 +1138,7 @@ PluginComponent {
         width: parent.width
         height: 44
         radius: 0
-        color: isSelected ? Theme.primaryHover : (actionMouse.containsMouse ? Theme.surfaceContainerHighest : "transparent")
+        color: isSelected ? Theme.primaryHover : (actionMouse.containsMouse ? Theme.surfaceHover : "transparent")
         border.width: 0
         opacity: enabled ? 1.0 : 0.5
 
